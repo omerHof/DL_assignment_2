@@ -1,4 +1,4 @@
-
+import time
 from random import shuffle
 import cv2
 import numpy as np
@@ -16,8 +16,10 @@ from keras import initializers
 from keras.layers import Lambda
 from keras.regularizers import l2, l1
 # from tensorflow.keras.optimizers import SGD
-from keras.optimizers import gradient_descent_v2
+import keras.optimizers
 import keras.backend as K
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 
 params = {
     'IMG_SHAPE': (250, 250, 1),
@@ -166,14 +168,46 @@ def configure_model(convnet,left_input,right_input):
     model = Model(inputs=[left_input, right_input], outputs=prediction)
 
     # optimizer= tensorflow.keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999)
-    optimizer = gradient_descent_v2.SGD(lr=0.01, momentum=0.5)
+    optimizer = keras.optimizers.SGD(lr=0.01, momentum=0.5)
     model.compile(loss="binary_crossentropy", optimizer=optimizer,
                   metrics=["accuracy"])
 
     print(model.summary())
+    return model
 
-def train_model():
-    pass
+
+def get_callbacks():
+    early_stopping = EarlyStopping(monitor='val_loss', patience=10)
+    filepath = "/models_checkpoints/weights-improvement-{epoch:02d}-{loss:.4f}.hdf5"
+    checkpoint = ModelCheckpoint(filepath, monitor='loss', verbose=1, save_best_only=True, mode='min')
+    rlop = ReduceLROnPlateau(patience=5)
+    return [early_stopping, checkpoint, rlop]
+
+
+def train_model(train_set):
+
+    x_train, X_val, y_train, y_val = train_test_split(train_set[0], train_set[1], test_size=0.2, random_state=42)
+    callbacks = get_callbacks()
+    start_time = time.time()
+    history = model.fit(
+        [x_train[:, 0], x_train[:, 1]], y_train[:],
+        validation_data=([X_val[:, 0], X_val[:, 1]], y_val[:]),
+        batch_size=params["BATCH_SIZE"],
+        epochs=params["EPOCHS"], callbacks=callbacks, verbose=2)
+    end_time = time.time()
+    print(
+        "epoch: {} epoch done: {} batch size: {} lr :{:.8f} momentum  final loss: {:.4f} final acc: {:.4f} final loss validation :{:.2f} %  "
+        'final acc validation: {:.2f} % time_taken {:.2f} m'.format(params["EPOCHS"], len(history.epoch), params["BATCH_SIZE"],
+                                                                    K.get_value(model.optimizer.learning_rate),
+                                                                    # K.get_value(model.optimizer.momentum),
+                                                                    history.history['loss'][len(history.epoch) - 1],
+                                                                    history.history['accuracy'][len(history.epoch) - 1],
+                                                                    history.history['val_loss'][len(history.epoch) - 1],
+                                                                    history.history['val_accuracy'][
+                                                                        len(history.epoch) - 1],
+                                                                    (end_time - start_time) / 60))
+    return model
+
 
 def evaluate_model():
     pass
@@ -190,6 +224,8 @@ if __name__ == '__main__':
     convnet = create_architecture()
     left_input = Input(shape=params['IMG_SHAPE'])
     right_input = Input(shape=params['IMG_SHAPE'])
-    configure_model = configure_model(convnet,left_input,right_input)
+    model = configure_model(convnet, left_input, right_input)
+
+    trained_model = train_model(train_set)
 
 
