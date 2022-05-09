@@ -20,6 +20,7 @@ import keras.optimizers
 import keras.backend as K
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
+import matplotlib.pyplot as plt
 
 params = {
     'IMG_SHAPE': (250, 250, 1),
@@ -184,6 +185,16 @@ def get_callbacks():
     return [early_stopping, checkpoint, rlop]
 
 
+def plot(train_results, val_results, title, y_label, batch_size):
+    plt.plot([i[0] for i in train_results], [i[1] for i in train_results], label=f'training {y_label}')
+    plt.plot([i[0] for i in val_results], [i[1] for i in val_results], label=f'validation {y_label}')
+    plt.title(f'{title}: batch size:{batch_size}')
+    plt.xlabel('Epochs')
+    plt.ylabel(y_label)
+    plt.legend()
+    plt.show()
+
+
 def train_model(train_set):
 
     x_train, X_val, y_train, y_val = train_test_split(train_set[0], train_set[1], test_size=0.2, random_state=42)
@@ -206,10 +217,17 @@ def train_model(train_set):
                                                                     history.history['val_accuracy'][
                                                                         len(history.epoch) - 1],
                                                                     (end_time - start_time) / 60))
+    plot(history.history['loss'], history.history['val_loss'], "Train validation loss", "Loss", params["BATCH_SIZE"])
+    plot(history.history['accuracy'], history.history['val_accuracy'], "Train validation accuracy", "Accuracy", params["BATCH_SIZE"])
+
     return model
 
 
-def evaluate_model():
+def evaluate_model(test_set, trained_model):
+    return trained_model.predict([test_set[:, 0], test_set[:, 1]])
+
+
+def show_results(results):
     pass
 
 
@@ -227,5 +245,7 @@ if __name__ == '__main__':
     model = configure_model(convnet, left_input, right_input)
 
     trained_model = train_model(train_set)
+    results = evaluate_model(test_set, trained_model)
+    show_results(results)
 
 
